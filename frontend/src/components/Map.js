@@ -23,12 +23,12 @@ const Map = ({ isLoaded, apiKey, currentPosition, path, heading, mode, mapType, 
   if (!isLoaded) return <div>Loading Map...</div>;
 
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: mode === 'dark' ? '#212121' : '#f5f5f5' }}>
       <GoogleMap
-        mapContainerStyle={{ width: '100%', height: '100%' }}
-        center={isTracking && currentPosition ? currentPosition : undefined}
+        mapContainerStyle={{ width: '100%', height: '100%', backgroundColor: mode === 'dark' ? '#212121' : '#f5f5f5' }}
+        center={isTracking ? (currentPosition || { lat: DEFAULT_LATITUDE, lng: DEFAULT_LONGITUDE }) : undefined}
         defaultCenter={{ lat: DEFAULT_LATITUDE, lng: DEFAULT_LONGITUDE }}
-        zoom={12}
+        zoom={19}
         options={mapOptions}
         mapTypeId={mapType}
         onLoad={(map) => (mapRef.current = map)}

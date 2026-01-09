@@ -39,7 +39,7 @@ function App() {
   const [isRosConnected, setIsRosConnected] = useState(false);
   const [confirmedGoal, setConfirmedGoal] = useState(null);
   const [machineInfo, setMachineInfo] = useState({});
-  const [isTracking, setIsTracking] = useState(false);
+  const [isTracking, setIsTracking] = useState(true);
   const [joystick, setJoystick] = useState({ linear: 0, angular: 0, axes: [], buttons: [], lin_scale: 1.0, ang_scale: 1.0 });
   const [goalReached, setGoalReached] = useState(false);
   const [cameraFront, setCameraFront] = useState(null);
@@ -448,46 +448,49 @@ function App() {
 
         {/* Main Content */}
         <Box sx={{ flexGrow: 1, p: 2, minHeight: 0, display: 'flex', justifyContent: 'center' }}>
-          <Box display="flex" width="100%" height="100%" gap={2}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 1fr)', width: '100%', height: '100%', gap: 4 }}>
 
             {/* Left Column (Map) */}
-            <Box sx={{ width: '75%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Paper sx={{ p: 2, mb: 0, borderRadius: '4px 4px 0 0' }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Global Position</Typography>
-              </Paper>
-              <Divider />
-              <Box sx={{ position: 'relative', flexGrow: 1, width: '100%', mt: 1 }}>
-                <Map
-                  isLoaded={isLoaded}
-                  apiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}
-                  currentPosition={currentGps}
-                  path={gpsPath}
-                  heading={getYawFromQuaternion(pose?.orientation)}
-                  mode={mode}
-                  mapType={mapType}
-                  isTracking={isTracking}
-                  setIsTracking={setIsTracking}
-                  goalPosition={confirmedGoal}
-                />
-                <Box sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 1 }}>
-                  <IconButton onClick={() => setIsTracking(!isTracking)} color={isTracking ? "primary" : "default"} sx={{ backgroundColor: 'background.paper', '&:hover': { backgroundColor: 'background.default' } }}>
-                    <MyLocation />
-                  </IconButton>
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Paper sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', bgcolor: 'background.paper', boxShadow: 3 }}>
+                <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Global Position</Typography>
                 </Box>
-                <Box sx={{ position: 'absolute', top: 12, right: 12, width: '260px', height: '260px' }}>
-                  <InfoCard title="" sx={{ height: '100%', backgroundColor: 'transparent', border: 'none', p: 1 }}>
-                    <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Box sx={{ width: '95%', height: '95%' }}>
-                        <Compass heading={heading} mode={mode} />
-                      </Box>
+                <Box sx={{ flexGrow: 1, p: 2, display: 'flex' }}>
+                  <Box sx={{ position: 'relative', flexGrow: 1, borderRadius: 4, overflow: 'hidden', boxShadow: 4, bgcolor: 'background.default' }}>
+                    <Map
+                      isLoaded={isLoaded}
+                      apiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}
+                      currentPosition={currentGps}
+                      path={gpsPath}
+                      heading={getYawFromQuaternion(pose?.orientation)}
+                      mode={mode}
+                      mapType={mapType}
+                      isTracking={isTracking}
+                      setIsTracking={setIsTracking}
+                      goalPosition={confirmedGoal}
+                    />
+                    <Box sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 1 }}>
+                      <IconButton onClick={() => setIsTracking(!isTracking)} color={isTracking ? "primary" : "default"} sx={{ backgroundColor: 'background.paper', '&:hover': { backgroundColor: 'background.default' } }}>
+                        <MyLocation />
+                      </IconButton>
                     </Box>
-                  </InfoCard>
+                    <Box sx={{ position: 'absolute', top: 12, right: 12, width: '260px', height: '260px' }}>
+                      <InfoCard title="" sx={{ height: '100%', backgroundColor: 'transparent', border: 'none', p: 1 }}>
+                        <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Box sx={{ width: '95%', height: '95%' }}>
+                            <Compass heading={heading} mode={mode} />
+                          </Box>
+                        </Box>
+                      </InfoCard>
+                    </Box>
+                  </Box>
                 </Box>
-              </Box>
+              </Paper>
             </Box>
 
             {/* Right Column (All other info) */}
-            <Box sx={{ width: '25%', display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '100%', overflowY: 'auto' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '100%', overflowY: 'auto' }}>
 
               {/* Camera Feed (WebSocket) */}
               <InfoCard title="" sx={{ p: 0 }}>
