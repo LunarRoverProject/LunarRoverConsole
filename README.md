@@ -35,7 +35,14 @@
     pip install -r requirements.txt
     cd ..
     ```
-    *（他のOS向けのコマンドは省略）*
+
+    **Linux / macOS / WSL:**
+    ```bash
+    cd backend
+    source venv/bin/activate
+    pip install -r requirements.txt
+    cd ..
+    ```
 
 4.  **ROS Bridgeのビルド**
     `ros_bridge` ディレクトリで、ワークスペースをビルドします。
