@@ -525,12 +525,12 @@ async def resubscribe_topics():
     active_listeners.append(goal_reached_listener)
     log(f"[ROS] Subscribed to {GOAL_REACHED_TOPIC} with throttle_rate={THROTTLE_MS}ms")
 
-    camera_front_listener = roslibpy.Topic(ros_client, CAMERA_FRONT_TOPIC, CAMERA_MSG_TYPE, throttle_rate=THROTTLE_MS)
+    camera_front_listener = roslibpy.Topic(ros_client, CAMERA_FRONT_TOPIC, CAMERA_MSG_TYPE, throttle_rate=THROTTLE_MS, queue_length=1)
     camera_front_listener.subscribe(_front_camera_callback)
     active_listeners.append(camera_front_listener)
     log(f"[ROS] Subscribed to {CAMERA_FRONT_TOPIC} with throttle_rate={THROTTLE_MS}ms")
 
-    camera_back_listener = roslibpy.Topic(ros_client, CAMERA_BACK_TOPIC, CAMERA_MSG_TYPE, throttle_rate=THROTTLE_MS)
+    camera_back_listener = roslibpy.Topic(ros_client, CAMERA_BACK_TOPIC, CAMERA_MSG_TYPE, throttle_rate=THROTTLE_MS, queue_length=1)
     camera_back_listener.subscribe(_back_camera_callback)
     active_listeners.append(camera_back_listener)
     log(f"[ROS] Subscribed to {CAMERA_BACK_TOPIC} with throttle_rate={THROTTLE_MS}ms")
