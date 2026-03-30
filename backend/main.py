@@ -181,6 +181,7 @@ def broadcast_connection_status():
 def handle_gps_data(lat, lng, alt, cov):
     global latest_rover_gps
     latest_rover_gps = {"latitude": lat, "longitude": lng}
+    log(f"[ROS] Received GPS: {{'latitude': {lat}, 'longitude': {lng}, 'altitude': {alt}}}")
     ts_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     queue_data_for_sheet('GPS', [ts_str, lat, lng, alt, str(cov)])
     if main_event_loop:
@@ -196,6 +197,7 @@ def handle_imu_data(ox, oy, oz, ow):
     pitch_deg = math.degrees(pitch)
     
     formatted_data = {"timestamp": received_timestamp, "heading": heading_deg, "roll": roll_deg, "pitch": pitch_deg}
+    log(f"[ROS] IMU (Map Heading): {heading_deg:.2f} (Yaw: {yaw_deg:.2f}, R: {roll_deg:.2f}, P: {pitch_deg:.2f})")
     ts_str = datetime.fromtimestamp(received_timestamp).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     queue_data_for_sheet('IMU', [ts_str, heading_deg, roll_deg, pitch_deg, ox, oy, oz, ow])
 
@@ -204,6 +206,7 @@ def handle_imu_data(ox, oy, oz, ow):
         asyncio.run_coroutine_threadsafe(coro, main_event_loop)
 
 def handle_generic_topic(msg_type, data):
+    log(f"[ROS] Received {msg_type}: {data}")
     if msg_type == "goal_reached":
         ts_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         queue_data_for_sheet('Status', [ts_str, 'Goal Reached', str(data)])
@@ -287,7 +290,7 @@ goal_publisher = None
 
 async def connect_to_ros():
     global ros_client, cmd_vel_publisher, goal_publisher
-    print(f"[ROS-WiFi] Attempting connection to ws://{ROSBRIDGE_IP}:{ROSBRIDGE_PORT}")
+    log(f"[ROS-WiFi] Attempting connection to ws://{ROSBRIDGE_IP}:{ROSBRIDGE_PORT}")
 
     ros_client = roslibpy.Ros(host=ROSBRIDGE_IP, port=ROSBRIDGE_PORT)
 
@@ -326,7 +329,9 @@ async def resubscribe_topics():
     def _rad_cb(msg): handle_generic_topic("actual_rad", msg.get("data"))
     def _targ_cb(msg): handle_generic_topic("targets", msg.get("data"))
     def _goal_cb(msg): handle_generic_topic("goal_reached", msg.get("data"))
-    def _pose_cb(msg): handle_generic_topic("pose", msg) # passes entire message
+    def _pose_cb(msg): 
+        log(f"[ROS] Received Pose: {msg}")
+        handle_generic_topic("pose", msg) # passes entire message
 
     listeners_def = [
         ('gps/fix', 'sensor_msgs/NavSatFix', _gps_cb),
@@ -415,6 +420,10 @@ async def publish_twist_command(command: str):
     await publish_analog_twist(l, a)
 
 async def publish_analog_twist(linear: float, angular: float):
+    if linear != 0.0 or angular != 0.0:
+        twist_str = f"{{'linear': {{'x': {linear}, 'y': 0.0, 'z': 0.0}}, 'angular': {{'x': 0.0, 'y': 0.0, 'z': {angular}}}}}"
+        log(f"[ROS] Publishing to cmd_vel: {twist_str}")
+        
     if USE_XBEE:
         xbee_write({"type": "cmd_vel", "linear": linear, "angular": angular})
     else:
@@ -427,6 +436,9 @@ async def publish_goal(goal_data: dict):
     lng = goal_data.get('longitude', 0.0)
     alt = goal_data.get('altitude', 0.0)
     
+    goal_str = f"{{'header': {{'stamp': {{'sec': {int(time.time())}, 'nanosec': 0}}, 'frame_id': 'gps'}}, 'latitude': {lat}, 'longitude': {lng}, 'altitude': {alt}, 'position_covariance': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 'position_covariance_type': 0}}"
+    log(f"[ROS] Publishing to goal/fix: {goal_str}")
+
     if USE_XBEE:
         xbee_write({"type": "goal_fix", "latitude": lat, "longitude": lng, "altitude": alt})
     else:
