@@ -14,7 +14,7 @@
 ├── backend/      # バックエンド (FastAPI, WebSocketサーバー)
 ├── frontend/     # フロントエンド (Reactアプリケーション)
 ├── ros_bridge/   # ROSブロック (ROS 2ワークスペース)
-└── ros_code/     # ROSノードスクリプト (参考用: 本アプリケーションの動作には直接関与しません)
+└── ros_code/     # ROSノードスクリプト 
 ```
 
 ## 手順

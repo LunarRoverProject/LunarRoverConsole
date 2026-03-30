@@ -5,3 +5,4 @@ roslibpy
 gspread
 google-auth
 google-auth-oauthlib
+pyserial
