@@ -478,36 +478,7 @@ async def resubscribe_topics():
 
 
 
-    def _process_compressed_image(message, camera_type):
-        try:
-            # message['data'] is typically a base64 encoded string of the compressed image (jpeg/png)
-            # We just need to prepend the data URI header.
-            # Assuming JPEG for 'compressed' transport usually.
-            # format could be 'jpeg', 'png' found in message['format']
-            
-            # Note: roslibpy decodes the base64 field automatically in some versions?
-            # Let's verify roslibpy behavior.
-            # roslibpy Message uses json only. The bridge sends base64 for uint8[].
-            # So message['data'] is base64 string.
-            
-            img_format = 'jpeg'
-            if 'png' in message.get('format', '').lower():
-                img_format = 'png'
-            
-            base64_data = message['data']
-            image_data_uri = f"data:image/{img_format};base64,{base64_data}"
-            
-            coro = manager.broadcast(json.dumps({"type": camera_type, "data": image_data_uri}))
-            asyncio.run_coroutine_threadsafe(coro, main_event_loop)
-        
-        except Exception as e:
-            log(f"[ROS] Error processing {camera_type} image message: {e}")
 
-    def _front_camera_callback(message):
-        _process_compressed_image(message, 'camera_front')
-
-    def _back_camera_callback(message):
-        _process_compressed_image(message, 'camera_back')
 
 
     actual_rad_listener = roslibpy.Topic(ros_client, ACTUAL_RAD_TOPIC, ACTUAL_RAD_MSG_TYPE, throttle_rate=THROTTLE_MS)
@@ -525,15 +496,7 @@ async def resubscribe_topics():
     active_listeners.append(goal_reached_listener)
     log(f"[ROS] Subscribed to {GOAL_REACHED_TOPIC} with throttle_rate={THROTTLE_MS}ms")
 
-    camera_front_listener = roslibpy.Topic(ros_client, CAMERA_FRONT_TOPIC, CAMERA_MSG_TYPE, throttle_rate=THROTTLE_MS, queue_length=1)
-    camera_front_listener.subscribe(_front_camera_callback)
-    active_listeners.append(camera_front_listener)
-    log(f"[ROS] Subscribed to {CAMERA_FRONT_TOPIC} with throttle_rate={THROTTLE_MS}ms")
 
-    camera_back_listener = roslibpy.Topic(ros_client, CAMERA_BACK_TOPIC, CAMERA_MSG_TYPE, throttle_rate=THROTTLE_MS, queue_length=1)
-    camera_back_listener.subscribe(_back_camera_callback)
-    active_listeners.append(camera_back_listener)
-    log(f"[ROS] Subscribed to {CAMERA_BACK_TOPIC} with throttle_rate={THROTTLE_MS}ms")
 
 
 

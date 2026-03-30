@@ -18,7 +18,10 @@ import Section from './components/Section';
 import { useJsApiLoader } from '@react-google-maps/api';
 import Map from './components/Map';
 
-// const CAMERA_STREAM_URL = 'http://localhost:8080/stream?topic=/camera/image_raw';
+const WEB_VIDEO_SERVER_URL = process.env.REACT_APP_WEB_VIDEO_SERVER_URL || 'http://localhost:8080';
+const CAMERA_FRONT_STREAM = `${WEB_VIDEO_SERVER_URL}/stream?topic=/camera_front/image/compressed`;
+const CAMERA_BACK_STREAM = `${WEB_VIDEO_SERVER_URL}/stream?topic=/camera_back/image/compressed`;
+
 const MAX_GPS_HISTORY = 200; // GPS軌跡の最大記録数
 
 // --- メインコンポーネント ---
@@ -42,8 +45,6 @@ function App() {
   const [isTracking, setIsTracking] = useState(true);
   const [joystick, setJoystick] = useState({ linear: 0, angular: 0, axes: [], buttons: [], lin_scale: 1.0, ang_scale: 1.0 });
   const [goalReached, setGoalReached] = useState(false);
-  const [cameraFront, setCameraFront] = useState(null);
-  const [cameraBack, setCameraBack] = useState(null);
   const [mapType, setMapType] = useState('roadmap'); // 'roadmap' or 'satellite'
   const [updateIntervalSeconds, setUpdateIntervalSeconds] = useState(1); // in seconds
   const [maximizedCamera, setMaximizedCamera] = useState(null); // 'front', 'back', or null
@@ -151,15 +152,7 @@ function App() {
         return;
       }
 
-      if (message.type === 'camera_front') {
-        setCameraFront(message.data);
-        return;
-      }
 
-      if (message.type === 'camera_back') {
-        setCameraBack(message.data);
-        return;
-      }
 
       if (message.type === 'gps') {
 
@@ -498,11 +491,15 @@ function App() {
                   <Box sx={{ flexGrow: 1, minHeight: '200px', borderRadius: '8px', overflow: 'hidden', background: '#000', display: 'flex', flexDirection: 'column', gap: 1 }}>
                     {/* Front Camera */}
                     <Box sx={{ position: 'relative', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                      {cameraFront ? (
-                        <img src={cameraFront} alt="Camera Front" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                      ) : (
-                        <Typography variant="body2" sx={{ color: 'grey.500' }}>No Front Signal</Typography>
-                      )}
+                      <img 
+                        src={CAMERA_FRONT_STREAM} 
+                        alt="Camera Front" 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+                        onLoad={(e) => { e.target.style.display = 'block'; e.target.nextSibling.style.display = 'none'; }}
+                      />
+                      <Typography variant="body2" sx={{ color: 'grey.500', display: 'none' }}>No Front Signal</Typography>
+
                       <Typography variant="caption" sx={{ position: 'absolute', top: 4, left: 4, color: 'white', bgcolor: 'rgba(0,0,0,0.5)', px: 0.5, borderRadius: 1 }}>Front</Typography>
                       <IconButton
                         size="small"
@@ -515,11 +512,15 @@ function App() {
                     <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)' }} />
                     {/* Back Camera */}
                     <Box sx={{ position: 'relative', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                      {cameraBack ? (
-                        <img src={cameraBack} alt="Camera Back" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                      ) : (
-                        <Typography variant="body2" sx={{ color: 'grey.500' }}>No Back Signal</Typography>
-                      )}
+                      <img 
+                        src={CAMERA_BACK_STREAM} 
+                        alt="Camera Back" 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+                        onLoad={(e) => { e.target.style.display = 'block'; e.target.nextSibling.style.display = 'none'; }}
+                      />
+                      <Typography variant="body2" sx={{ color: 'grey.500', display: 'none' }}>No Back Signal</Typography>
+
                       <Typography variant="caption" sx={{ position: 'absolute', top: 4, left: 4, color: 'white', bgcolor: 'rgba(0,0,0,0.5)', px: 0.5, borderRadius: 1 }}>Back</Typography>
                       <IconButton
                         size="small"
@@ -655,14 +656,11 @@ function App() {
           >
             <Close />
           </IconButton>
-          {maximizedCamera === 'front' && cameraFront && (
-            <img src={cameraFront} alt="Front Camera Full" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          {maximizedCamera === 'front' && (
+            <img src={CAMERA_FRONT_STREAM} alt="Front Camera Full" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           )}
-          {maximizedCamera === 'back' && cameraBack && (
-            <img src={cameraBack} alt="Back Camera Full" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-          )}
-          {((maximizedCamera === 'front' && !cameraFront) || (maximizedCamera === 'back' && !cameraBack)) && (
-            <Typography variant="h5" sx={{ color: 'grey.500' }}>No Signal</Typography>
+          {maximizedCamera === 'back' && (
+            <img src={CAMERA_BACK_STREAM} alt="Back Camera Full" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           )}
         </DialogContent>
       </Dialog>
