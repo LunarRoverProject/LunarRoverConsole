@@ -20,7 +20,7 @@ tmux kill-session -t $SESSION 2>/dev/null
 echo "Starting servers in a 4-pane layout..."
 
 # [Pane 1] 左上: ROS Bridge
-tmux new-session -d -s $SESSION -n "Console" "cd ros_bridge_ws && source install/setup.bash || true && ros2 launch rosbridge_server rosbridge_websocket_launch.xml; exec bash"
+tmux new-session -d -s $SESSION -n "Console" "cd ros_bridge_ws && ros2 launch rosbridge_server rosbridge_websocket_launch.xml; exec bash"
 
 # [Pane 2] 右上: Web Video Server (左右に2分割)
 tmux split-window -h "ros2 run web_video_server web_video_server; exec bash"

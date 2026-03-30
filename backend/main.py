@@ -289,6 +289,8 @@ async def connect_to_ros():
     global ros_client, cmd_vel_publisher, goal_publisher
     print(f"[ROS-WiFi] Attempting connection to ws://{ROSBRIDGE_IP}:{ROSBRIDGE_PORT}")
 
+    ros_client = roslibpy.Ros(host=ROSBRIDGE_IP, port=ROSBRIDGE_PORT)
+
     def _on_close(*args):
         log("[ROS-WiFi] Disconnected.")
         broadcast_connection_status()
