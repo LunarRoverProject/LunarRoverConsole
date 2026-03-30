@@ -1,6 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 import asyncio
 import json
 import time
@@ -8,419 +7,378 @@ import threading
 from google.oauth2 import service_account
 import gspread
 import os
-import math # Added for coordinate conversion
-import base64
-import sys
+import math
 import re
-import numpy as np
-import cv2
 from datetime import datetime
 from dotenv import load_dotenv
-import serial
+
+load_dotenv()
+
+# --- 実行モードの設定 ---
+# True なら XBee (シリアル通信) モード。
+# False なら 従来の rosbridge (Wi-Fi通信) モード。
+USE_XBEE = False
+
+if USE_XBEE:
+    import serial
+else:
+    import roslibpy
+    from twisted.internet import reactor
 
 # --- Logging Setup ---
 log_queue = []
 data_queue = [] # Queue for topic data: [sheet_name, row_data]
 LOG_SHEET_NAME = 'ConsoleLog'
 
-
 def log(message, upload=True):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     formatted_message = f"[{timestamp}] {message}"
     print(formatted_message)
     
-    if not upload:
-        return
+    if not upload: return
 
-    # Parse type from message (e.g., "[ROS] Connected..." -> type="ROS", content="Connected...")
     log_type = "General"
     content = message
-    
-    # Match pattern: start of string, optional whitespace, [TYPE], space, rest of message
     match = re.match(r'^\s*\[(.*?)\]\s?(.*)', message)
     if match:
         log_type = match.group(1)
         content = match.group(2)
 
-    # Queue for Google Sheets: Timestamp, Type, Message
     log_queue.append([timestamp, log_type, content])
+
+# --- Google Sheets Setup ---
+SPREADSHEET_ID = '1-lNnJv-WoQuhm-Tfg297eg-JENLAWAjZ7oc5hBWsSlw'
+SHEET_NAME = 'RawData'
+gs_client = None
+last_sheet_update_time = 0
+SHEET_UPDATE_INTERVAL = 5 # seconds
 
 def get_gs_client():
     global gs_client
-    if gs_client:
-        return gs_client
-    
+    if gs_client: return gs_client
     try:
         creds_json_str = os.getenv("GOOGLE_CREDENTIALS_JSON")
         if not creds_json_str:
-            log("[GSheets] GOOGLE_CREDENTIALS_JSON environment variable not found.", upload=False)
+            log("[GSheets] GOOGLE_CREDENTIALS_JSON not found.", upload=False)
             return None
-        
         creds_info = json.loads(creds_json_str)
-        
         creds = service_account.Credentials.from_service_account_info(
-            creds_info,
-            scopes=['https://www.googleapis.com/auth/spreadsheets']
+            creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets']
         )
         gs_client = gspread.authorize(creds)
-        log("[GSheets] Google Sheets client authorized.", upload=True) # One-time success can be uploaded
+        log("[GSheets] Google Sheets authorized.", upload=True)
         return gs_client
     except Exception as e:
-        log(f"[GSheets] Error authorizing Google Sheets client: {e}", upload=False)
+        log(f"[GSheets] Error authorizing: {e}", upload=False)
         return None
+
+def queue_data_for_sheet(sheet_name, row_data):
+    data_queue.append([sheet_name, row_data])
 
 async def process_log_queue():
     while True:
-        await asyncio.sleep(5) # Upload every 5 seconds
-        if not log_queue:
-            continue
-
-        # Drain queue up to a limit or all
+        await asyncio.sleep(5)
+        if not log_queue: continue
         batch = []
-        # Simple drain
         while log_queue:
             batch.append(log_queue.pop(0))
-        
-        if not batch:
-            continue
+        if not batch: continue
             
         client = get_gs_client()
-        if not client:
-            continue
-
+        if not client: continue
         try:
-            if SPREADSHEET_ID == 'YOUR_SPREADSHEET_ID_HERE':
-                continue
-            
+            if SPREADSHEET_ID == 'YOUR_SPREADSHEET_ID_HERE': continue
             spreadsheet = client.open_by_key(SPREADSHEET_ID)
-            # Ensure sheet exists or just append? Assuming it exists per user request.
             try:
                 worksheet = spreadsheet.worksheet(LOG_SHEET_NAME)
+                worksheet.append_rows(batch)
             except gspread.exceptions.WorksheetNotFound:
-                 log(f"[GSheets] Sheet {LOG_SHEET_NAME} not found. Skipping log upload.", upload=False)
-                 continue
-
-            worksheet.append_rows(batch)
-        except Exception as e:
-            log(f"[GSheets] Error uploading logs: {e}", upload=False)
+                 pass
+        except Exception:
+            pass
 
 async def process_data_queue():
     while True:
-        await asyncio.sleep(5) # Upload every 5 seconds
-        if not data_queue:
-            continue
-
-        # Drain queue
-        batch_map = {} # sheet_name -> list of rows
+        await asyncio.sleep(5)
+        if not data_queue: continue
+        batch_map = {}
         while data_queue:
             item = data_queue.pop(0)
-            sheet_name = item[0]
-            row_data = item[1]
+            sheet_name, row_data = item[0], item[1]
             if sheet_name not in batch_map:
                 batch_map[sheet_name] = []
             batch_map[sheet_name].append(row_data)
         
-        if not batch_map:
-            continue
-            
+        if not batch_map: continue
         client = get_gs_client()
-        if not client:
-            continue
-
-        if SPREADSHEET_ID == 'YOUR_SPREADSHEET_ID_HERE':
-            continue
+        if not client or SPREADSHEET_ID == 'YOUR_SPREADSHEET_ID_HERE': continue
 
         try:
             spreadsheet = client.open_by_key(SPREADSHEET_ID)
-            
             for sheet_name, rows in batch_map.items():
                 try:
                     worksheet = spreadsheet.worksheet(sheet_name)
                 except gspread.exceptions.WorksheetNotFound:
                     try:
                         worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=10)
-                        log(f"[GSheets] Created new sheet: {sheet_name}")
-                    except Exception as create_err:
-                        log(f"[GSheets] Error creating sheet {sheet_name}: {create_err}", upload=False)
+                        log(f"[GSheets] Created sheet: {sheet_name}")
+                    except Exception:
                         continue
-
                 worksheet.append_rows(rows)
-                
-        except Exception as e:
-            log(f"[GSheets] Error uploading data batch: {e}", upload=False)
+        except Exception:
+            pass
 
-
-load_dotenv()
-
+# --- FastAPI & WebSocket Setup ---
 app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- CORS 設定 ---
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-]
+main_event_loop = None
+latest_rover_gps = None
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- グローバル変数 ---
-main_event_loop = None # メインの asyncio イベントループを保存
-latest_rover_gps = None # ローバーの最新GPSデータを保存
-
-# --- XBee 設定 ---
-XBEE_PORT = os.getenv('XBEE_PORT', 'COM3')
-XBEE_BAUD_RATE = int(os.getenv('XBEE_BAUD_RATE', '115200'))
-xbee_serial = None
-xbee_connected = False
-
-# --- Google Sheets 設定 ---
-SPREADSHEET_ID = '1-lNnJv-WoQuhm-Tfg297eg-JENLAWAjZ7oc5hBWsSlw' # 例: '1_aBcDeFgHiJkLmNoPqRsTuVwXyZ-1234567890'
-SHEET_NAME = 'RawData' # 例: 'RawData'
-
-gs_client = None
-
-# WebSocket クライアント管理
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
-
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
-
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
     async def broadcast(self, message: str):
         for connection in self.active_connections:
-            try:
-                await connection.send_text(message)
-            except Exception:
-                pass
+            try: await connection.send_text(message)
+            except Exception: pass
 
 manager = ConnectionManager()
-
-last_sheet_update_time = 0
-SHEET_UPDATE_INTERVAL = 5 # seconds
 
 def quaternion_to_euler(x, y, z, w):
     t0 = +2.0 * (w * x + y * z)
     t1 = +1.0 - 2.0 * (x * x + y * y)
     roll_x = math.atan2(t0, t1)
-    
     t2 = +2.0 * (w * y - z * x)
     t2 = +1.0 if t2 > +1.0 else t2
     t2 = -1.0 if t2 < -1.0 else t2
     pitch_y = math.asin(t2)
-    
     t3 = +2.0 * (w * z + x * y)
     t4 = +1.0 - 2.0 * (y * y + z * z)
     yaw_z = math.atan2(t3, t4)
+    return roll_x, pitch_y, yaw_z 
+
+# ==========================================
+# 共通データハンドラー
+# ==========================================
+def broadcast_connection_status():
+    is_connected = False
+    if USE_XBEE:
+        is_connected = xbee_connected
+    else:
+        is_connected = ros_client.is_connected if ros_client else False
     
-    return roll_x, pitch_y, yaw_z # in radians
+    # どちらのモードでもフロントエンドには "ros_status" として送る
+    coro = manager.broadcast(json.dumps({"type": "ros_status", "data": {"connected": is_connected}}))
+    if main_event_loop:
+        asyncio.run_coroutine_threadsafe(coro, main_event_loop)
 
+def handle_gps_data(lat, lng, alt, cov):
+    global latest_rover_gps
+    latest_rover_gps = {"latitude": lat, "longitude": lng}
+    ts_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    queue_data_for_sheet('GPS', [ts_str, lat, lng, alt, str(cov)])
+    if main_event_loop:
+        coro = manager.broadcast(json.dumps({"type": "gps", "data": {"latitude": lat, "longitude": lng, "altitude": alt}}))
+        asyncio.run_coroutine_threadsafe(coro, main_event_loop)
 
-# --- Google Sheets 連携関数 ---
-async def append_to_sheet(values: list):
-    global gs_client, last_sheet_update_time
+def handle_imu_data(ox, oy, oz, ow):
+    received_timestamp = time.time()
+    roll, pitch, yaw = quaternion_to_euler(ox, oy, oz, ow)
+    yaw_deg = math.degrees(yaw)
+    heading_deg = (90 - yaw_deg) % 360
+    roll_deg = math.degrees(roll)
+    pitch_deg = math.degrees(pitch)
+    
+    formatted_data = {"timestamp": received_timestamp, "heading": heading_deg, "roll": roll_deg, "pitch": pitch_deg}
+    ts_str = datetime.fromtimestamp(received_timestamp).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    queue_data_for_sheet('IMU', [ts_str, heading_deg, roll_deg, pitch_deg, ox, oy, oz, ow])
 
-    current_time = time.time()
-    if current_time - last_sheet_update_time < SHEET_UPDATE_INTERVAL:
-        log(f"[GSheets] Skipping update due to rate limit. Next update in {SHEET_UPDATE_INTERVAL - (current_time - last_sheet_update_time):.2f}s")
-        return
-    last_sheet_update_time = current_time
-    log("[GSheets] Attempting to append data...")
+    if main_event_loop:
+        coro = manager.broadcast(json.dumps({"type": "imu", "data": formatted_data}))
+        asyncio.run_coroutine_threadsafe(coro, main_event_loop)
 
-    if gs_client is None:
-        if not get_gs_client():
-            return
+def handle_generic_topic(msg_type, data):
+    if msg_type == "goal_reached":
+        ts_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        queue_data_for_sheet('Status', [ts_str, 'Goal Reached', str(data)])
+    if main_event_loop:
+        coro = manager.broadcast(json.dumps({"type": msg_type, "data": data}))
+        asyncio.run_coroutine_threadsafe(coro, main_event_loop)
 
-    try:
-        if SPREADSHEET_ID == 'YOUR_SPREADSHEET_ID_HERE':
-            log("[GSheets] SPREADSHEET_ID is not set. Skipping Google Sheets logging.")
-            return
-        
-        spreadsheet = gs_client.open_by_key(SPREADSHEET_ID)
-        worksheet = spreadsheet.worksheet(SHEET_NAME)
-        worksheet.append_row(values)
-    except Exception as e:
-        log(f"[GSheets] Error appending data: {e}")
-        log("[GSheets] Make sure SPREADSHEET_ID is correct and the sheet is shared with the service account email.")
+# ==========================================
+# XBEE MODE LOGIC
+# ==========================================
+XBEE_PORT = os.getenv('XBEE_PORT', 'COM3')
+XBEE_BAUD_RATE = int(os.getenv('XBEE_BAUD_RATE', '115200'))
+xbee_serial = None
+xbee_connected = False
 
-def queue_data_for_sheet(sheet_name, row_data):
-    data_queue.append([sheet_name, row_data])
-
-# --- XBee 接続とデータ転送 ---
 def xbee_read_loop():
-    global xbee_connected, main_event_loop, xbee_serial
-    
+    global xbee_connected, xbee_serial
     while True:
         try:
             if xbee_serial is None or not xbee_serial.is_open:
                 try:
                     xbee_serial = serial.Serial(XBEE_PORT, XBEE_BAUD_RATE, timeout=2)
                     xbee_connected = True
-                    log(f"[XBee] Connected to {XBEE_PORT} at {XBEE_BAUD_RATE} baud.")
-                    if main_event_loop:
-                        coro = manager.broadcast(json.dumps({"type": "xbee_status", "data": {"connected": True}}))
-                        asyncio.run_coroutine_threadsafe(coro, main_event_loop)
+                    log(f"[XBee] Connected on {XBEE_PORT}")
+                    broadcast_connection_status()
                 except Exception as e:
                     xbee_connected = False
-                    log(f"[XBee] Failed to connect on {XBEE_PORT}: {e}", upload=False)
+                    log(f"[XBee] Connect failed: {e}", upload=False)
                     time.sleep(2)
                     continue
 
             if xbee_serial.in_waiting > 0:
                 line = xbee_serial.readline().decode('utf-8', errors='ignore').strip()
                 if line:
-                    process_incoming_xbee_data(line)
+                    try:
+                        msg = json.loads(line)
+                        m_type = msg.get("type", "")
+                        data = msg.get("data", {})
+                        
+                        if m_type == "gps":
+                            handle_gps_data(data.get("latitude"), data.get("longitude"), data.get("altitude"), data.get("position_covariance"))
+                        elif m_type == "imu":
+                            o = data.get('orientation', {})
+                            handle_imu_data(o.get('x'), o.get('y'), o.get('z'), o.get('w'))
+                        elif m_type == "pose":
+                            handle_generic_topic("pose", data)
+                        elif m_type in ["speed", "rpm", "actual_rad", "targets", "goal_reached"]:
+                            handle_generic_topic(m_type, data)
+                    except json.JSONDecodeError:
+                        pass
             else:
                 time.sleep(0.01)
                 
         except serial.SerialException as e:
-            log(f"[XBee] Serial disconnected or error: {e}")
+            log(f"[XBee] Disconnected: {e}")
             xbee_connected = False
-            if xbee_serial:
-                xbee_serial.close()
+            if xbee_serial: xbee_serial.close()
             time.sleep(2)
-        except Exception as e:
-            log(f"[XBee] Unexpected error in read loop: {e}", upload=False)
+        except Exception:
             time.sleep(1)
 
-def process_incoming_xbee_data(line):
-    global latest_rover_gps, main_event_loop
-    try:
-        message = json.loads(line)
-        msg_type = message.get("type", "")
-        data = message.get("data", {})
-
-        if msg_type == "gps":
-            latest_rover_gps = {"latitude": data.get("latitude"), "longitude": data.get("longitude")}
-            ts_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            queue_data_for_sheet('GPS', [
-                ts_str, data.get('latitude'), data.get('longitude'), data.get('altitude'), str(data.get('position_covariance'))
-            ])
-            if main_event_loop:
-                coro = manager.broadcast(json.dumps({"type": "gps", "data": data}))
-                asyncio.run_coroutine_threadsafe(coro, main_event_loop)
-
-        elif msg_type == "imu":
-            received_timestamp = time.time()
-            orientation = data.get('orientation', {})
-            ox = orientation.get('x', 0.0)
-            oy = orientation.get('y', 0.0)
-            oz = orientation.get('z', 0.0)
-            ow = orientation.get('w', 1.0)
-            
-            roll, pitch, yaw = quaternion_to_euler(ox, oy, oz, ow)
-            yaw_deg = math.degrees(yaw)
-            heading_deg = (90 - yaw_deg) % 360
-            roll_deg = math.degrees(roll)
-            pitch_deg = math.degrees(pitch)
-
-            formatted_data = {
-                "timestamp": received_timestamp,
-                "heading": heading_deg,
-                "roll": roll_deg,
-                "pitch": pitch_deg
-            }
-            
-            ts_str = datetime.fromtimestamp(received_timestamp).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            queue_data_for_sheet('IMU', [
-                ts_str, heading_deg, roll_deg, pitch_deg, ox, oy, oz, ow
-            ])
-
-            if main_event_loop:
-                coro = manager.broadcast(json.dumps({"type": "imu", "data": formatted_data}))
-                asyncio.run_coroutine_threadsafe(coro, main_event_loop)
-
-        elif msg_type == "pose":
-            if main_event_loop:
-                coro = manager.broadcast(json.dumps({"type": "pose", "data": data}))
-                asyncio.run_coroutine_threadsafe(coro, main_event_loop)
-            
-            # Gsheet logic for pose
-            try:
-                timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(data['header']['stamp']['sec']))
-                position = data['pose']['position']
-                orientation = data['pose']['orientation']
-                row_data = [
-                    timestamp,
-                    position['x'], position['y'], position['z'],
-                    orientation['x'], orientation['y'], orientation['z'], orientation['w']
-                ]
-                queue_data_for_sheet('Pose', row_data)
-            except Exception:
-                pass
-            
-        elif msg_type in ["speed", "rpm", "actual_rad", "targets", "goal_reached"]:
-            if msg_type == "goal_reached":
-                ts_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                queue_data_for_sheet('Status', [ts_str, 'Goal Reached', str(data)])
-
-            if main_event_loop:
-                coro = manager.broadcast(json.dumps({"type": msg_type, "data": data}))
-                asyncio.run_coroutine_threadsafe(coro, main_event_loop)
-                
-    except json.JSONDecodeError:
-        pass # Ignore corrupt serial lines
-    except Exception as e:
-        log(f"[XBee] Error processing line {line}: {e}", upload=False)
-
-def write_to_xbee(msg_dict):
+def xbee_write(msg_dict):
     global xbee_serial
     if xbee_serial and xbee_serial.is_open:
         try:
-            msg_str = json.dumps(msg_dict) + "\n"
-            xbee_serial.write(msg_str.encode('utf-8'))
+            xbee_serial.write((json.dumps(msg_dict) + "\n").encode('utf-8'))
         except Exception as e:
-            log(f"[XBee] Error writing to serial: {e}")
+            log(f"[XBee] Write error: {e}")
 
+# ==========================================
+# ROS WI-FI MODE LOGIC (roslibpy)
+# ==========================================
+ROSBRIDGE_IP = os.getenv('ROSBRIDGE_IP', 'localhost')
+ROSBRIDGE_PORT = int(os.getenv('ROSBRIDGE_PORT', '9090'))
+ros_client = None
+active_listeners = []
+THROTTLE_MS = 100
+
+cmd_vel_publisher = None
+goal_publisher = None
+
+async def connect_to_ros():
+    global ros_client, cmd_vel_publisher, goal_publisher
+    print(f"[ROS-WiFi] Attempting connection to ws://{ROSBRIDGE_IP}:{ROSBRIDGE_PORT}")
+
+    def _on_close(*args):
+        log("[ROS-WiFi] Disconnected.")
+        broadcast_connection_status()
+
+    ros_client.on('closing', _on_close)
+    
+    ros_thread = threading.Thread(target=lambda: reactor.run(installSignalHandlers=False), daemon=True)
+    ros_thread.start()
+
+    while not ros_client.is_connected:
+        log("[ROS-WiFi] Waiting for ROS Bridge connection... Retrying in 1 second...")
+        await asyncio.sleep(1)
+        
+    log("[ROS-WiFi] Connected!")
+    broadcast_connection_status()
+    
+    cmd_vel_publisher = roslibpy.Topic(ros_client, 'cmd_vel', 'geometry_msgs/Twist')
+    goal_publisher = roslibpy.Topic(ros_client, 'goal/fix', 'sensor_msgs/NavSatFix')
+
+    await resubscribe_topics()
+
+async def resubscribe_topics():
+    global active_listeners
+    for listener in active_listeners: listener.unsubscribe()
+    active_listeners = []
+    
+    def _gps_cb(msg): handle_gps_data(msg.get("latitude"), msg.get("longitude"), msg.get("altitude"), msg.get("position_covariance"))
+    def _imu_cb(msg): 
+        o = msg.get('orientation', {})
+        handle_imu_data(o.get('x',0), o.get('y',0), o.get('z',0), o.get('w',1))
+    def _speed_cb(msg): handle_generic_topic("speed", msg.get("data"))
+    def _rpm_cb(msg): handle_generic_topic("rpm", msg.get("data"))
+    def _rad_cb(msg): handle_generic_topic("actual_rad", msg.get("data"))
+    def _targ_cb(msg): handle_generic_topic("targets", msg.get("data"))
+    def _goal_cb(msg): handle_generic_topic("goal_reached", msg.get("data"))
+    def _pose_cb(msg): handle_generic_topic("pose", msg) # passes entire message
+
+    listeners_def = [
+        ('gps/fix', 'sensor_msgs/NavSatFix', _gps_cb),
+        ('bno055/imu', 'sensor_msgs/Imu', _imu_cb),
+        ('/rover/speed', 'std_msgs/Float32', _speed_cb),
+        ('/rover/rpm', 'std_msgs/Float32', _rpm_cb),
+        ('/C620/actual_rad', 'std_msgs/Float64MultiArray', _rad_cb),
+        ('/rover/targets', 'std_msgs/Float64MultiArray', _targ_cb),
+        ('/goal_reached', 'std_msgs/msg/Bool', _goal_cb),
+        ('/rover/pose', 'geometry_msgs/PoseStamped', _pose_cb)
+    ]
+    
+    for topic, msg_type, cb in listeners_def:
+        listener = roslibpy.Topic(ros_client, topic, msg_type, throttle_rate=THROTTLE_MS)
+        listener.subscribe(cb)
+        active_listeners.append(listener)
+
+
+# ==========================================
+# FastAPI Lifecycle & Endpoints
+# ==========================================
 @app.on_event("startup")
 async def startup_event():
     global main_event_loop
     main_event_loop = asyncio.get_event_loop()
     
-    # Start background tasks
-    xbee_thread = threading.Thread(target=xbee_read_loop, daemon=True)
-    xbee_thread.start()
-    
+    if USE_XBEE:
+        log("[System] Mode: XBee Serial")
+        threading.Thread(target=xbee_read_loop, daemon=True).start()
+    else:
+        log("[System] Mode: ROS Wi-Fi (roslibpy)")
+        asyncio.create_task(connect_to_ros())
+        
     asyncio.create_task(process_log_queue())
     asyncio.create_task(process_data_queue())
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    global xbee_serial
-    if xbee_serial and xbee_serial.is_open:
-        log("[XBee] Closing XBee serial port.")
+    if USE_XBEE and xbee_serial and xbee_serial.is_open:
         xbee_serial.close()
-    
+    elif not USE_XBEE and ros_client and ros_client.is_connected:
+        ros_client.close()
+        reactor.callFromThread(reactor.stop)
+        
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    [task.cancel() for task in tasks]
-    log(f"[Shutdown] Cancelled {len(tasks)} background tasks.")
+    [t.cancel() for t in tasks]
 
-
-# --- FastAPI エンドポイント ---
 @app.get("/")
-async def read_root():
-    return {"message": "Hello from FastAPI! XBee integration is running."}
+async def read_root(): return {"message": f"Backend is running! Mode: {'XBee' if USE_XBEE else 'Wi-Fi'}"}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
-    # 新規クライアントに現在の接続ステータスを送信
-    await manager.send_personal_message(
-        json.dumps({"type": "xbee_status", "data": {"connected": xbee_connected}}),
-        websocket
-    )
+    broadcast_connection_status() # send initial status
     try:
         while True:
             data = await websocket.receive_text()
@@ -429,71 +387,55 @@ async def websocket_endpoint(websocket: WebSocket):
             msg_data = message.get("data")
 
             if msg_type == "rover-command":
-                command = msg_data.get("command")
-                await publish_twist_command(command)
+                await publish_twist_command(msg_data.get("command"))
             elif msg_type == "twist-command":
-                linear = msg_data.get("linear", 0.0)
-                angular = msg_data.get("angular", 0.0)
-                await publish_analog_twist(linear, angular)
+                await publish_analog_twist(msg_data.get("linear", 0.0), msg_data.get("angular", 0.0))
             elif msg_type == "publish-goal":
-                goal_data = msg_data.get("goalData")
-                await publish_goal(goal_data)
+                await publish_goal(msg_data.get("goalData"))
             elif msg_type == "set-refresh-rate":
-                pass # This is now managed at the rover XBee publishing side if needed.
-            else:
-                log(f"[WebSocket] Unknown message type: {msg_type}")
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        log(f"[WebSocket] Client disconnected.")
-    except asyncio.CancelledError:
-        manager.disconnect(websocket)
-        log(f"[WebSocket] Client connection cancelled (asyncio).")
-    except Exception as e:
-        log(f"[WebSocket] Error: {e}")
+                if not USE_XBEE:
+                    global THROTTLE_MS
+                    THROTTLE_MS = int(msg_data.get("interval_seconds", 0.1) * 1000)
+                    await resubscribe_topics()
+    except Exception:
         manager.disconnect(websocket)
 
-# --- XBee コマンド発行関数 ---
 async def publish_twist_command(command: str):
-    linear_speed = 0.2
-    angular_speed = 0.5
-    twist = {"linear": 0.0, "angular": 0.0}
+    linear_speed, angular_speed = 0.2, 0.5
+    l, a = 0.0, 0.0
+    if command == 'forward': l = linear_speed
+    elif command == 'backward': l = -linear_speed
+    elif command == 'left': a = angular_speed
+    elif command == 'right': a = -angular_speed
+    elif command == 'stop': pass
+    else: return
 
-    if command == 'forward':
-        twist["linear"] = linear_speed
-    elif command == 'backward':
-        twist["linear"] = -linear_speed
-    elif command == 'left':
-        twist["angular"] = angular_speed
-    elif command == 'right':
-        twist["angular"] = -angular_speed
-    elif command == 'stop':
-        pass 
-    else:
-        print(f"[XBee] Unknown command: {command}")
-        return
-
-    # log(f"[XBee] Publishing twist_command: {twist}")
-    write_to_xbee({"type": "cmd_vel", "linear": twist["linear"], "angular": twist["angular"]})
+    await publish_analog_twist(l, a)
 
 async def publish_analog_twist(linear: float, angular: float):
-    if linear != 0.0 or angular != 0.0:
-        pass # Optional log
-    write_to_xbee({"type": "cmd_vel", "linear": linear, "angular": angular})
+    if USE_XBEE:
+        xbee_write({"type": "cmd_vel", "linear": linear, "angular": angular})
+    else:
+        if ros_client and ros_client.is_connected:
+            twist = roslibpy.Message({'linear': {'x': linear, 'y': 0.0, 'z': 0.0}, 'angular': {'x': 0.0, 'y': 0.0, 'z': angular}})
+            cmd_vel_publisher.publish(twist)
 
 async def publish_goal(goal_data: dict):
-    latitude = goal_data.get('latitude', 0.0)
-    longitude = goal_data.get('longitude', 0.0)
-    altitude = goal_data.get('altitude', 0.0)
+    lat = goal_data.get('latitude', 0.0)
+    lng = goal_data.get('longitude', 0.0)
+    alt = goal_data.get('altitude', 0.0)
     
-    log(f"[XBee] Publishing goal_fix: {latitude}, {longitude}")
-    write_to_xbee({
-        "type": "goal_fix",
-        "latitude": latitude,
-        "longitude": longitude,
-        "altitude": altitude
-    })
+    if USE_XBEE:
+        xbee_write({"type": "goal_fix", "latitude": lat, "longitude": lng, "altitude": alt})
+    else:
+        if ros_client and ros_client.is_connected:
+            goal_msg = roslibpy.Message({
+                'header': {'stamp': {'sec': int(time.time()), 'nanosec': 0}, 'frame_id': 'gps'},
+                'latitude': lat, 'longitude': lng, 'altitude': alt,
+                'position_covariance': [0.0]*9, 'position_covariance_type': 0
+            })
+            goal_publisher.publish(goal_msg)
 
-    # Broadcast back to frontend
-    coro = manager.broadcast(json.dumps({"type": "goal_set", "data": {"lat": latitude, "lng": longitude}}))
+    # Broadcast to frontend
+    coro = manager.broadcast(json.dumps({"type": "goal_set", "data": {"lat": lat, "lng": lng}}))
     asyncio.run_coroutine_threadsafe(coro, main_event_loop)

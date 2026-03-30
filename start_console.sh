@@ -8,7 +8,7 @@ echo "=================================================="
 trap 'echo "Stopping all servers..."; kill $FRONTEND_PID $BACKEND_PID $ROSBRIDGE_PID $WEBVIDEO_PID; exit' SIGINT SIGTERM
 
 echo -e "\n[1/4] Starting ROS Bridge (WebSocket)..."
-cd ros_bridge
+cd ros_bridge_ws
 # ROS 2 環境を読み込んで起動
 source install/setup.bash || true
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml &
