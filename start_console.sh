@@ -1,41 +1,45 @@
 #!/bin/bash
 
 echo "=================================================="
-echo "  Lunar Rover Console - One-Click Start (Ubuntu)"
+echo "  Lunar Rover Console - tmux 4 Splits (Ubuntu)"
 echo "=================================================="
 
-# 終了時にバックグラウンドプロセスも一緒にキルするための設定
-trap 'echo "Stopping all servers..."; kill $FRONTEND_PID $BACKEND_PID $ROSBRIDGE_PID $WEBVIDEO_PID; exit' SIGINT SIGTERM
+# tmux がインストールされているか確認
+if ! command -v tmux &> /dev/null
+then
+    echo "tmux is not installed. Please install it with: sudo apt install tmux"
+    echo "Attempting to install tmux..."
+    sudo apt update && sudo apt install -y tmux
+fi
 
-echo -e "\n[1/4] Starting ROS Bridge (WebSocket)..."
-cd ros_bridge_ws
-# ROS 2 環境を読み込んで起動
-source install/setup.bash || true
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml &
-ROSBRIDGE_PID=$!
-cd ..
+SESSION="lunar_rover_session"
 
-echo -e "\n[2/4] Starting Web Video Server (Camera Socket)..."
-ros2 run web_video_server web_video_server &
-WEBVIDEO_PID=$!
+# すでに同じ名前のセッションが裏で動いていれば強制終了して新しく作り直す
+tmux kill-session -t $SESSION 2>/dev/null
 
-echo -e "\n[3/4] Starting Backend (FastAPI)..."
-cd backend
-uvicorn main:app --reload --host 0.0.0.0 &
-BACKEND_PID=$!
-cd ..
+echo "Starting servers in a 4-pane layout..."
 
-echo -e "\nWaiting 5 seconds for backend and ROS nodes to initialize..."
-sleep 5
+# [Pane 1] 左上: ROS Bridge
+tmux new-session -d -s $SESSION -n "Console" "cd ros_bridge_ws && source install/setup.bash || true && ros2 launch rosbridge_server rosbridge_websocket_launch.xml; exec bash"
 
-echo -e "\n[4/4] Starting Frontend (React)..."
-cd frontend
-npm start &
-FRONTEND_PID=$!
-cd ..
+# [Pane 2] 右上: Web Video Server (左右に2分割)
+tmux split-window -h "ros2 run web_video_server web_video_server; exec bash"
 
-echo -e "\n🚀 Launch sequence initiated!"
-echo "Press [Ctrl + C] to stop all servers at any time."
+# [Pane 3] 左下: Backend (FastAPI) (pane 0=左上 を選んで上下に分割)
+tmux select-pane -t 0
+tmux split-window -v "cd backend && uvicorn main:app --reload --host 0.0.0.0; exec bash"
 
-# バックグラウンドプロセスの完了を待つ（Ctrl+Cが押されるまでループ）
-wait $FRONTEND_PID $BACKEND_PID $ROSBRIDGE_PID $WEBVIDEO_PID
+# [Pane 4] 右下: Frontend (React) (pane 2=右上 を選んで上下に分割)
+tmux select-pane -t 2
+tmux split-window -v "sleep 5 && cd frontend && npm start; exec bash"
+
+# すべてのペインが同じ大きさになるようにタイル状に整える
+tmux select-layout tiled
+
+# マウス操作でペインのサイズを変えられるように設定（おまけ）
+tmux set-option -g mouse on
+
+# セッションを画面に表示！
+# 注: 終了するときはこのターミナル画面で「Ctrl+b を押したあと d」を押すか、
+#    tmux kill-session -t lunar_rover_session と入力します。
+tmux attach-session -t $SESSION
