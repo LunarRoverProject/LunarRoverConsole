@@ -34,26 +34,7 @@
     cd ..
     ```
 
-3.  **バックエンドのセットアップ**
-    `backend` ディレクトリで、お使いのシェルに合わせて仮想環境をアクティベートし、依存関係をインストールします。
-
-    **Windows (PowerShell):**
-    ```powershell
-    cd backend
-    .\venv\Scripts\Activate.ps1
-    pip install -r requirements.txt
-    cd ..
-    ```
-
-    **Linux / macOS / WSL:**
-    ```bash
-    cd backend
-    source venv/bin/activate
-    pip install -r requirements.txt
-    cd ..
-    ```
-
-4.  **ROS Bridgeのビルド**
+3.  **ROS Bridgeのビルド**
     `ros_bridge` ディレクトリで、ワークスペースをビルドします。
     ```bash
     cd ros_bridge
@@ -96,4 +77,23 @@ cd ros_bridge
 source install/setup.bash
 
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+```
+
+---
+
+### 5. カメラ映像サーバーの起動 (ローバー側PC)
+
+カメラの映像を超低遅延で配信するために、ローバーに搭載されたUbuntuマシンで以下の2つのプロセスを動かしてください。
+
+**A. QoSブリッジの起動 (新しいターミナル)**
+カメラが送信する`BEST_EFFORT`（高頻度）なデータを、ビデオサーバーが受け取れる`RELIABLE`へと変換します。
+```bash
+cd ros_code
+python3 qos_bridge.py
+```
+
+**B. web_video_serverの起動 (新しいターミナル)**
+ブラウザ向けに映像をストリーミング配信するサーバーを起動します。
+```bash
+ros2 run web_video_server web_video_server
 ```
