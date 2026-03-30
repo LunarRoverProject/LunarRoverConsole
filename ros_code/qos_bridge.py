@@ -23,11 +23,11 @@ class QosBridge(Node):
         )
         
         # Front Camera
-        self.pub_front = self.create_publisher(CompressedImage, '/camera_front/image/compressed_reliable', reliable_qos)
+        self.pub_front = self.create_publisher(CompressedImage, '/camera_front/image_reliable/compressed', reliable_qos)
         self.sub_front = self.create_subscription(CompressedImage, '/camera_front/image/compressed', self.front_callback, best_effort_qos)
         
         # Back Camera
-        self.pub_back = self.create_publisher(CompressedImage, '/camera_back/image/compressed_reliable', reliable_qos)
+        self.pub_back = self.create_publisher(CompressedImage, '/camera_back/image_reliable/compressed', reliable_qos)
         self.sub_back = self.create_subscription(CompressedImage, '/camera_back/image/compressed', self.back_callback, best_effort_qos)
         
         self.get_logger().info('QoS Bridge is running. Translating BEST_EFFORT to RELIABLE.')
