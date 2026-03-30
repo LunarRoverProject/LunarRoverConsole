@@ -18,7 +18,7 @@ import Section from './components/Section';
 import { useJsApiLoader } from '@react-google-maps/api';
 import Map from './components/Map';
 
-const WEB_VIDEO_SERVER_URL = process.env.REACT_APP_WEB_VIDEO_SERVER_URL || 'http://localhost:8080';
+const WEB_VIDEO_SERVER_URL = process.env.REACT_APP_WEB_VIDEO_SERVER_URL || 'http://192.168.137.26:8080';
 const CAMERA_FRONT_STREAM = `${WEB_VIDEO_SERVER_URL}/stream?topic=/camera_front/image_reliable&type=ros_compressed`;
 const CAMERA_BACK_STREAM = `${WEB_VIDEO_SERVER_URL}/stream?topic=/camera_back/image_reliable&type=ros_compressed`;
 
@@ -491,10 +491,10 @@ function App() {
                   <Box sx={{ flexGrow: 1, minHeight: '200px', borderRadius: '8px', overflow: 'hidden', background: '#000', display: 'flex', flexDirection: 'column', gap: 1 }}>
                     {/* Front Camera */}
                     <Box sx={{ position: 'relative', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                      <img 
-                        src={CAMERA_FRONT_STREAM} 
-                        alt="Camera Front" 
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                      <img
+                        src={CAMERA_FRONT_STREAM}
+                        alt="Camera Front"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                         onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
                         onLoad={(e) => { e.target.style.display = 'block'; e.target.nextSibling.style.display = 'none'; }}
                       />
@@ -512,9 +512,9 @@ function App() {
                     <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)' }} />
                     {/* Back Camera */}
                     <Box sx={{ position: 'relative', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                      <img 
-                        src={CAMERA_BACK_STREAM} 
-                        alt="Camera Back" 
+                      <img
+                        src={CAMERA_BACK_STREAM}
+                        alt="Camera Back"
                         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                         onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
                         onLoad={(e) => { e.target.style.display = 'block'; e.target.nextSibling.style.display = 'none'; }}
