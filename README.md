@@ -1,38 +1,62 @@
 # 月面ローバー制御コンソール
 
 ## 概要
-このプロジェクトは、月面ローバーを制御するためのコンソールアプリケーションです。フロントエンド、バックエンド、およびROS (Robot Operating System) ノードで構成されています。
-
-## 特徴
-- **フロントエンド**: ローバーの状態表示、コマンド送信のためのユーザーインターフェース。
-- **バックエンド**: フロントエンドとROSノード間の通信を仲介し、データ処理を行います。
-- **ROSノード**: ローバーのセンサーデータ（GPS、IMUなど）の取得、モーター制御コマンドの送信など、ローバーとの直接的なインタラクションを担当します。
+このプロジェクトは、月面ローバーを制御するためのコンソールアプリケーションです。
+映像データはWi-Fi（`web_video_server`）経由で、GPSや操作コマンドなどのテレメトリデータは **XBee（シリアル通信）** 経由で送受信するハイブリッド構成になっています。
 
 ## プロジェクト構成
 ```
 .
-├── backend/      # バックエンド (FastAPI, WebSocketサーバー)
+├── backend/      # バックエンド (FastAPI, pyserial: XBee通信の仲介)
 ├── frontend/     # フロントエンド (Reactアプリケーション)
-├── ros_bridge/   # ROSブロック (ROS 2ワークスペース)
-└── ros_code/     # ROSノードスクリプト 
+├── ros_code/     # Ubuntuローバー側で動かすROS中継スクリプト群
+├── start_console.bat # Windows用の一撃起動ファイル
+└── ros_bridge/   # (※旧ネットワーク通信用の名残。現在は使用していません)
 ```
 
-## 手順
+---
 
-### 1. 全体のセットアップ
+## 🚀 起動方法 (一撃起動)
 
-1.  **リポジトリのクローン**
-    ```bash
-    git clone [リポジトリのURL]
-    cd LunarRoverConsole
-    ```
+初期設定（後述）が完了していれば、以下の手順で一発でシステムを立ち上げられます。
 
-2.  **フロントエンドのセットアップ**
-    ```bash
-    cd frontend
-    npm install
-    cd ..
-    ```
+### 💻 Windows（コンソール）側の起動
+プロジェクトフォルダの中にある **`start_console.bat`** をダブルクリックしてください。
+自動的にフロント画面（React）と裏側（FastAPI）の2つの黒い画面が立ち上がり、ローバーとの接続を待機します。
+
+### 🐧 Ubuntu（ローバー）側の起動
+XBeeを挿したUbuntuのターミナルで、プロジェクトフォルダを開き、以下のコマンドを実行します。
+```bash
+ros2 launch ros_code/rover_launch.py
+```
+これにより「映像配信」「QoS変換」「XBee通信」の3つのプログラムが同時に起動し、Windows側へデータが飛び始めます！
+
+---
+
+## ⚙️ 初回セットアップ手順
+
+### 1. リポジトリのクローン
+```bash
+git clone [リポジトリのURL]
+cd LunarRoverConsole
+```
+
+### 2. 環境変数の設定 (重要)
+基地局PCで、それぞれ設定ファイルを作ります。
+
+**【基地局PC側】 `backend/.env` を作成**
+接続したXBeeのCOMポート番号を指定します。（例: COM4）
+```env
+XBEE_PORT=COM4
+XBEE_BAUD_RATE=115200
+```
+
+### 3. フロントエンドのセットアップ (Windows)
+```bash
+cd frontend
+npm install
+cd ..
+```
 
 3.  **ROS Bridgeのビルド**
     `ros_bridge` ディレクトリで、ワークスペースをビルドします。
@@ -59,10 +83,6 @@ npm start
 **新しいターミナル**で、バックエンドを起動します。
 ```bash
 cd backend
-# 仮想環境をアクティベート
-source venv/bin/activate 
-# または .\venv\Scripts\Activate.ps1
-
 uvicorn main:app --reload --host 0.0.0.0
 ```
 
