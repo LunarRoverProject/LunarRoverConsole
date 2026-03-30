@@ -19,8 +19,8 @@ import { useJsApiLoader } from '@react-google-maps/api';
 import Map from './components/Map';
 
 const WEB_VIDEO_SERVER_URL = process.env.REACT_APP_WEB_VIDEO_SERVER_URL || 'http://localhost:8080';
-const CAMERA_FRONT_STREAM = `${WEB_VIDEO_SERVER_URL}/stream?topic=/camera_front/image/compressed_reliable`;
-const CAMERA_BACK_STREAM = `${WEB_VIDEO_SERVER_URL}/stream?topic=/camera_back/image/compressed_reliable`;
+const CAMERA_FRONT_STREAM = `${WEB_VIDEO_SERVER_URL}/stream?topic=/camera_front/image/compressed_reliable&type=ros_compressed`;
+const CAMERA_BACK_STREAM = `${WEB_VIDEO_SERVER_URL}/stream?topic=/camera_back/image/compressed_reliable&type=ros_compressed`;
 
 const MAX_GPS_HISTORY = 200; // GPS軌跡の最大記録数
 
