@@ -20,7 +20,7 @@ tmux kill-session -t $SESSION 2>/dev/null
 echo "Starting servers in a 4-pane layout..."
 
 # [Pane 1] 左上: ROS Bridge
-tmux new-session -d -s $SESSION -n "Console" "cd ros_bridge_ws && ros2 launch rosbridge_server rosbridge_websocket_launch.xml; exec bash"
+tmux new-session -d -s $SESSION -n "Console" "source /opt/ros/humble/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml; exec bash"
 
 # [Pane 2] 右上: Web Video Server (左右に2分割)
 tmux split-window -h "ros2 run web_video_server web_video_server; exec bash"
@@ -34,7 +34,7 @@ tmux select-pane -t 2
 tmux split-window -v "sleep 5 && cd frontend && npm start; exec bash"
 
 # [Pane 5] 追加: QoS Bridge
-tmux split-window -v "cd ros_code && python3 qos_bridge.py; exec bash"
+tmux split-window -v "source /opt/ros/humble/setup.bash && cd ros_code_ws/src && python3 qos_bridge.py; exec bash"
 
 # すべてのペインが同じ大きさになるようにタイル状に整える
 tmux select-layout tiled

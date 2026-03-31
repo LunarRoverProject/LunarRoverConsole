@@ -5,15 +5,15 @@ echo ==================================================
 
 echo.
 echo Starting ROS Bridge (WebSocket) in WSL...
-start "ros-bridge" cmd /k "wsl bash -c 'cd ros_bridge_ws && source install/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml'"
+start "ros-bridge" wsl bash -c "source /opt/ros/humble/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml; exec bash"
 
 echo.
 echo Starting Web Video Server (Camera Socket) in WSL...
-start "web-video" cmd /k "wsl bash -c 'source /opt/ros/humble/setup.bash && ros2 run web_video_server web_video_server'"
+start "web-video" wsl bash -c "source /opt/ros/humble/setup.bash && ros2 run web_video_server web_video_server; exec bash"
 
 echo.
 echo Starting QoS Bridge in WSL...
-start "qos-bridge" cmd /k "wsl bash -c 'source /opt/ros/humble/setup.bash && cd ros_code && python3 qos_bridge.py'"
+start "qos-bridge" wsl bash -c "source /opt/ros/humble/setup.bash && cd ros_code_ws/src && python3 qos_bridge.py; exec bash"
 
 echo.
 echo Starting Backend (FastAPI + XBee) in a new window...
