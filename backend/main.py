@@ -15,9 +15,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- 実行モードの設定 ---
-# True なら XBee (シリアル通信) モード。
-# False なら 従来の rosbridge (Wi-Fi通信) モード。
-USE_XBEE = False
+# True  = XBee ATモード (シリアル通信)
+# False = Wi-Fiモード (rosbridge WebSocket)
+USE_XBEE = True  # ← モードはここを変更
 
 if USE_XBEE:
     import serial
@@ -279,7 +279,7 @@ def xbee_write(msg_dict):
 # ==========================================
 # ROS WI-FI MODE LOGIC (roslibpy)
 # ==========================================
-ROSBRIDGE_IP = os.getenv('ROSBRIDGE_IP', 'localhost')
+ROSBRIDGE_IP   = os.getenv('ROSBRIDGE_IP',   'localhost')
 ROSBRIDGE_PORT = int(os.getenv('ROSBRIDGE_PORT', '9090'))
 ros_client = None
 active_listeners = []
@@ -380,7 +380,10 @@ async def shutdown_event():
     [t.cancel() for t in tasks]
 
 @app.get("/")
-async def read_root(): return {"message": f"Backend is running! Mode: {'XBee' if USE_XBEE else 'Wi-Fi'}"}
+async def read_root():
+    mode = 'XBee (AT mode)' if USE_XBEE else 'Wi-Fi (rosbridge)'
+    port_info = f" on {XBEE_PORT}" if USE_XBEE else f" ws://{ROSBRIDGE_IP}:{ROSBRIDGE_PORT}"
+    return {"message": f"Backend is running! Mode: {mode}{port_info}"}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

@@ -46,22 +46,23 @@ cd LunarRoverConsole
 ```
 
 ### 2. 環境変数の設定 (重要)
-基地局PCで、それぞれ設定ファイルを作ります。
+`backend/.env.example` を複製して `.env` を作成し、自分の環境に合わせた値を入力します。
 
-**【基地局PC側】 `backend/.env` を作成**
-通信方式やロギングに合わせた環境変数を指定します。
-```env
-# XBee使用時のポート（例: WindowsならCOM4, Ubuntuなら/dev/ttyUSB0）
-XBEE_PORT=COM4
-XBEE_BAUD_RATE=115200
-
-# Wi-Fi通信時のローバー側IP（テスト用なら localhost）
-ROSBRIDGE_IP=localhost
-ROSBRIDGE_PORT=9090
-
-# Google Sheetsログレコーダーを使用する場合（JSON文字列）
-# GOOGLE_CREDENTIALS_JSON='{...}'
+```bash
+cd backend
+cp .env.example .env   # Windows (PowerShell) なら: Copy-Item .env.example .env
 ```
+
+後は `.env` をエディタで開き、以下の値を自分の環境に合わせて変更してください。
+| 変数 | 設定例 | 説明 |
+|---|---|---|
+| `XBEE_PORT` | `COM3` (Windows) / `/dev/ttyUSB0` (Ubuntu) | XBeeのシリアルポート |
+| `XBEE_BAUD_RATE` | `115200` | XBeeのボーレート（大乃そのまま） |
+| `ROSBRIDGE_IP` | ローバーのIPアドレス | Wi-Fiモード時のみ使用 |
+
+> [!NOTE]
+> 通信モードの切り替えは `backend/main.py` の先頭の `USE_XBEE` で行います。
+> `True` = XBee ATモード / `False` = Wi-Fi (rosbridge) モード
 
 ### 3. フロントエンドの起動
 ```bash
@@ -109,4 +110,17 @@ python3 qos_bridge.py
 ブラウザ向けに映像をストリーミング配信するサーバーを起動します。
 ```bash
 ros2 run web_video_server web_video_server
+```
+
+### 7. XBeeブリッジの起動 (ローバー側PC) — XBeeモード時のみ
+
+`backend/main.py` の `USE_XBEE = True` に設定している場合のみ必要です。
+XBee3モジュールをローバー側のシリアルポート（`/dev/ttyUSB0`等）に接続し、以下を実行します。
+
+```bash
+cd ros_code_ws/src
+source /opt/ros/humble/setup.bash
+export XBEE_PORT=/dev/ttyUSB0    # 実際のポートに合わせて変更
+export XBEE_BAUD_RATE=115200
+python3 xbee_rover_bridge.py
 ```
