@@ -9,12 +9,12 @@ main.pyでROSとXBeeの通信を切り替えられます。
 ## プロジェクト構成
 ```
 .
-├── backend/      # バックエンド (FastAPI, pyserial: XBee通信の仲介)
-├── frontend/     # フロントエンド (Reactアプリケーション)
-├── ros_code/     # Ubuntuローバー側で動かすROS中継スクリプト群
-├── start_console.bat # Windows用の一斉起動ファイル
-├── start_console.sh # Ubuntu用の一斉起動ファイル
-└── ros_bridge/   # (※旧ネットワーク通信用の名残。現在は使用していません)
+├── backend/            # バックエンド (FastAPI, pyserial: XBee通信の仲介)
+├── frontend/           # フロントエンド (Reactアプリケーション)
+├── ros_code/           # Ubuntuローバー側で動かすROS中継スクリプト群
+├── start_console.bat   # Windows用の一斉起動ファイル
+├── start_console.sh    # Ubuntu用の一斉起動ファイル
+└── ros_bridge/         # ROS_bridge (WebとROSの仲介)
 ```
 
 ---
@@ -23,17 +23,14 @@ main.pyでROSとXBeeの通信を切り替えられます。
 
 初期設定（後述）が完了していれば、以下の手順で一発でシステムを立ち上げられます。
 
-### 💻 Windows（コンソール）側の起動
-プロジェクトフォルダの中にある **`start_console.bat`** をダブルクリックしてください。
-自動的にフロント画面（React）と裏側（FastAPI）の2つの黒い画面が立ち上がり、ローバーとの接続を待機します。
+### 💻 Windowsでの起動方法
+LunarRoverConsoleフォルダ直下にある **`start_console.bat`** をダブルクリックしてください。
 
 ### 🐧 Ubuntu（ローバー）側の起動
-XBeeを挿したUbuntuのターミナルで、プロジェクトフォルダを開き、以下のコマンドを実行します。
+Ubuntuのターミナルで、プロジェクトフォルダを開き、以下のコマンドを実行します。
 ```bash
 ./start_console.sh
 ```
-これにより「映像配信」「QoS変換」「XBee通信」の3つのプログラムが同時に起動し、Windows側へデータが飛び始めます！
-
 ---
 
 ## ⚙️ 初回セットアップ手順
