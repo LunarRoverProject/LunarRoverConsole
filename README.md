@@ -51,6 +51,8 @@ XBEE_PORT=COM4
 XBEE_BAUD_RATE=115200
 ```
 
+---
+
 ### 3. フロントエンドの起動
 ```bash
 cd frontend
@@ -58,7 +60,9 @@ npm install
 npm start
 ```
 
-### 3. バックエンドの起動
+---
+
+### 4. バックエンドの起動
 
 **新しいターミナル**で、バックエンドを起動します。
 ```bash
@@ -68,7 +72,7 @@ uvicorn main:app --reload --host 0.0.0.0
 
 ---
 
-### 4. ROS Bridgeの起動
+### 5. ROS Bridgeの起動
 
 **新しいターミナル**で、ROS Bridgeを起動します。
 ```bash
@@ -81,7 +85,7 @@ ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 
 ---
 
-### 5. カメラ映像サーバーの起動 (ローバー側PC)
+### 6. カメラ映像サーバーの起動 (ローバー側PC)
 
 カメラの映像を超低遅延で配信するために、ローバーに搭載されたUbuntuマシンで以下の2つのプロセスを動かしてください。
 
