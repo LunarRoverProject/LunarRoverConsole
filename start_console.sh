@@ -33,6 +33,9 @@ tmux split-window -v "cd backend && uvicorn main:app --reload --host 0.0.0.0; ex
 tmux select-pane -t 2
 tmux split-window -v "sleep 5 && cd frontend && npm start; exec bash"
 
+# [Pane 5] 追加: QoS Bridge
+tmux split-window -v "cd ros_code && python3 qos_bridge.py; exec bash"
+
 # すべてのペインが同じ大きさになるようにタイル状に整える
 tmux select-layout tiled
 

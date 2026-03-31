@@ -12,6 +12,10 @@ echo Starting Web Video Server (Camera Socket) in WSL...
 start "web-video" cmd /k "wsl bash -c 'source /opt/ros/humble/setup.bash && ros2 run web_video_server web_video_server'"
 
 echo.
+echo Starting QoS Bridge in WSL...
+start "qos-bridge" cmd /k "wsl bash -c 'source /opt/ros/humble/setup.bash && cd ros_code && python3 qos_bridge.py'"
+
+echo.
 echo Starting Backend (FastAPI + XBee) in a new window...
 start "rover-backend" cmd /k "cd backend && uvicorn main:app --reload --host 0.0.0.0"
 
