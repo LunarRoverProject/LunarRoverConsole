@@ -17,6 +17,18 @@ SESSION="lunar_rover_session"
 # すでに同じ名前のセッションが裏で動いていれば強制終了して新しく作り直す
 tmux kill-session -t $SESSION 2>/dev/null
 
+# --- 残留プロセスをポートごと解放 ---
+echo "Cleaning up existing processes..."
+for PORT in 8000 8080 9090; do
+    if fuser ${PORT}/tcp &>/dev/null 2>&1; then
+        echo "  Killing process on port ${PORT}..."
+        fuser -k ${PORT}/tcp 2>/dev/null
+    fi
+done
+# uvicorn / rosbridge が名前で残っている場合も念のため kill
+pkill -f "uvicorn" 2>/dev/null
+sleep 1
+
 echo "Starting servers in a 4-pane layout..."
 
 # [Pane 1] 左上: ROS Bridge
