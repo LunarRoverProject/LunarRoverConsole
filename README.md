@@ -18,7 +18,7 @@
 ├── ros_code/           # Ubuntuローバー側で動かすROS中継スクリプト群
 ├── start_console.bat   # Windows用の一斉起動ファイル
 ├── start_console.sh    # Ubuntu用の一斉起動ファイル
-└── ros_bridge/         # ROS_bridge (WebとROSの仲介)
+└── ros_bridge_ws/      # ROS_bridge (WebとROSの仲介)
 ```
 
 ---
@@ -84,7 +84,7 @@ uvicorn main:app --reload --host 0.0.0.0
 
 **新しいターミナル**で、ROS Bridgeを起動します。
 ```bash
-cd ros_bridge
+cd ros_bridge_ws
 colcon build
 # 環境設定ファイルを読み込む
 source install/setup.bash

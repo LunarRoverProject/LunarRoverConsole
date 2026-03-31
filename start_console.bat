@@ -5,7 +5,7 @@ echo ==================================================
 
 echo.
 echo Starting ROS Bridge (WebSocket) in WSL...
-start "ros-bridge" cmd /k "wsl bash -c 'cd ros_bridge && source install/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml'"
+start "ros-bridge" cmd /k "wsl bash -c 'cd ros_bridge_ws && source install/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml'"
 
 echo.
 echo Starting Web Video Server (Camera Socket) in WSL...
