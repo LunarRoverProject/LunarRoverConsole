@@ -2,7 +2,9 @@
 
 ## 概要
 このプロジェクトは、月面ローバーを制御するためのコンソールアプリケーションです。
-映像データはWi-Fi（`web_video_server`）経由で、GPSや操作コマンドなどのテレメトリデータは **XBee（シリアル通信）** 経由で送受信するハイブリッド構成になっています。
+main.pyでROSとXBeeの通信を切り替えられます。
+1.映像データはWi-Fi（`web_video_server`）経由で、GPSや操作コマンドなどのテレメトリデータは **XBee（シリアル通信）** 経由で送受信するハイブリッド構成
+2.すべてWi-Fiで送受信する構成
 
 ## プロジェクト構成
 ```
@@ -10,13 +12,14 @@
 ├── backend/      # バックエンド (FastAPI, pyserial: XBee通信の仲介)
 ├── frontend/     # フロントエンド (Reactアプリケーション)
 ├── ros_code/     # Ubuntuローバー側で動かすROS中継スクリプト群
-├── start_console.bat # Windows用の一撃起動ファイル
+├── start_console.bat # Windows用の一斉起動ファイル
+├── start_console.sh # Ubuntu用の一斉起動ファイル
 └── ros_bridge/   # (※旧ネットワーク通信用の名残。現在は使用していません)
 ```
 
 ---
 
-## 🚀 起動方法 (一撃起動)
+## 🚀 起動方法 (一斉起動)
 
 初期設定（後述）が完了していれば、以下の手順で一発でシステムを立ち上げられます。
 
@@ -27,7 +30,7 @@
 ### 🐧 Ubuntu（ローバー）側の起動
 XBeeを挿したUbuntuのターミナルで、プロジェクトフォルダを開き、以下のコマンドを実行します。
 ```bash
-ros2 launch ros_code/rover_launch.py
+./start_console.sh
 ```
 これにより「映像配信」「QoS変換」「XBee通信」の3つのプログラムが同時に起動し、Windows側へデータが飛び始めます！
 
@@ -45,38 +48,18 @@ cd LunarRoverConsole
 基地局PCで、それぞれ設定ファイルを作ります。
 
 **【基地局PC側】 `backend/.env` を作成**
-接続したXBeeのCOMポート番号を指定します。（例: COM4）
+接続したXBeeのCOMポート番号を指定します。※Xbee使用時（例: COM4）
 ```env
 XBEE_PORT=COM4
 XBEE_BAUD_RATE=115200
 ```
 
-### 3. フロントエンドのセットアップ (Windows)
+### 3. フロントエンドの起動
 ```bash
 cd frontend
 npm install
-cd ..
-```
-
-3.  **ROS Bridgeのビルド**
-    `ros_bridge` ディレクトリで、ワークスペースをビルドします。
-    ```bash
-    cd ros_bridge
-    colcon build
-    cd ..
-    ```
-
----
-
-### 2. フロントエンドの起動
-
-**新しいターミナル**で、フロントエンドを起動します。
-```bash
-cd frontend
 npm start
 ```
-
----
 
 ### 3. バックエンドの起動
 
@@ -93,9 +76,9 @@ uvicorn main:app --reload --host 0.0.0.0
 **新しいターミナル**で、ROS Bridgeを起動します。
 ```bash
 cd ros_bridge
+colcon build
 # 環境設定ファイルを読み込む
 source install/setup.bash
-
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 ```
 
