@@ -2,9 +2,13 @@
 
 ## 概要
 このプロジェクトは、月面ローバーを制御するためのコンソールアプリケーションです。
-main.pyでROSとXBeeの通信を切り替えられます。
-1.映像データはWi-Fi（`web_video_server`）経由で、GPSや操作コマンドなどのテレメトリデータは **XBee（シリアル通信）** 経由で送受信するハイブリッド構成
-2.すべてWi-Fiで送受信する構成
+`backend/main.py` 内の `USE_XBEE` 変数を変更することで、通信方式を以下の2つから切り替えられます。
+
+1. **`USE_XBEE = True` の場合（ハイブリッド構成）**
+   映像データはWi-Fi（`web_video_server`）経由で、GPSや操作コマンドなどのテレメトリデータは **XBee（シリアル通信）** 経由で送受信します。
+
+2. **`USE_XBEE = False` の場合（Wi-Fi構成）**
+   すべてWi-Fi経由で送受信します。
 
 ## プロジェクト構成
 ```
@@ -51,16 +55,12 @@ XBEE_PORT=COM4
 XBEE_BAUD_RATE=115200
 ```
 
----
-
 ### 3. フロントエンドの起動
 ```bash
 cd frontend
 npm install
 npm start
 ```
-
----
 
 ### 4. バックエンドの起動
 
@@ -69,8 +69,6 @@ npm start
 cd backend
 uvicorn main:app --reload --host 0.0.0.0
 ```
-
----
 
 ### 5. ROS Bridgeの起動
 
@@ -82,8 +80,6 @@ colcon build
 source install/setup.bash
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 ```
-
----
 
 ### 6. カメラ映像サーバーの起動 (ローバー側PC)
 
