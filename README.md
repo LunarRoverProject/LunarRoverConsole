@@ -25,12 +25,12 @@
 
 ## 🚀 起動方法 (一斉起動)
 
-初期設定（後述）が完了していれば、以下の手順で一発でシステムを立ち上げられます。
+2回目以降は、以下の手順で一発でシステムを立ち上げられます。
 
 ### 💻 Windowsでの起動方法
 LunarRoverConsoleフォルダ直下にある **`start_console.bat`** をダブルクリックしてください。
 
-### 🐧 Ubuntu（ローバー）側の起動
+### 🐧 Ubuntuでの起動方法
 Ubuntuのターミナルで、プロジェクトフォルダを開き、以下のコマンドを実行します。
 ```bash
 ./start_console.sh
@@ -49,10 +49,18 @@ cd LunarRoverConsole
 基地局PCで、それぞれ設定ファイルを作ります。
 
 **【基地局PC側】 `backend/.env` を作成**
-接続したXBeeのCOMポート番号を指定します。※Xbee使用時（例: COM4）
+通信方式やロギングに合わせた環境変数を指定します。
 ```env
+# XBee使用時のポート（例: WindowsならCOM4, Ubuntuなら/dev/ttyUSB0）
 XBEE_PORT=COM4
 XBEE_BAUD_RATE=115200
+
+# Wi-Fi通信時のローバー側IP（テスト用なら localhost）
+ROSBRIDGE_IP=localhost
+ROSBRIDGE_PORT=9090
+
+# Google Sheetsログレコーダーを使用する場合（JSON文字列）
+# GOOGLE_CREDENTIALS_JSON='{...}'
 ```
 
 ### 3. フロントエンドの起動
@@ -65,8 +73,10 @@ npm start
 ### 4. バックエンドの起動
 
 **新しいターミナル**で、バックエンドを起動します。
+初回は依存パッケージのインストールが必要です。
 ```bash
 cd backend
+pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0
 ```
 
@@ -89,6 +99,7 @@ ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 カメラが送信する`BEST_EFFORT`（高頻度）なデータを、ビデオサーバーが受け取れる`RELIABLE`へと変換します。
 ```bash
 cd ros_code
+source /opt/ros/humble/setup.bash
 python3 qos_bridge.py
 ```
 
